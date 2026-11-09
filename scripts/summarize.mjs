@@ -15,8 +15,13 @@ const raw = JSON.parse(fs.readFileSync(IN, "utf8"));
 const champKeys = await (async () => {
   const v = (await (await fetch("https://ddragon.leagueoflegends.com/api/versions.json")).json())[0];
   const d = (await (await fetch(`https://ddragon.leagueoflegends.com/cdn/${v}/data/en_US/champion.json`)).json()).data;
-  return Object.fromEntries(Object.values(d).map(c => [c.id, +c.key]));
+  return { key: Object.fromEntries(Object.values(d).map(c => [c.id, +c.key])),
+    id: Object.fromEntries(Object.values(d).map(c => [c.id.toLowerCase(), c.id])),
+    trinkets: new Set(Object.entries((await (await fetch(`https://ddragon.leagueoflegends.com/cdn/${v}/data/en_US/item.json`)).json()).data)
+      .filter(([, it]) => (it.tags || []).includes("Trinket")).map(([id]) => id)) };
 })();
+// la API usa a veces otra capitalización (FiddleSticks) que Data Dragon (Fiddlesticks)
+const ddId = n => champKeys.id[n.toLowerCase()] || n;
 
 // cota inferior de Wilson al 90 %: premia el winrate alto sin fiarse de muestras pequeñas
 const wilson = (w, n, z = 1.645) => {
@@ -47,11 +52,14 @@ for (const [key, c] of Object.entries(raw.champs)) {
   const [name, role] = key.split("|");
   if (c.g < 5) continue;
   const runes = best(c.runes, c.g), shards = best(c.shards, c.g), sums = best(c.sums, c.g);
-  const core = best(c.core, c.g), boots = best(c.boots, c.g), start = best(c.start, c.g), skills = best(c.skills, c.g);
+  const startClean = {};
+  for (const [k, [g, w]] of Object.entries(c.start)) { const kk = k.split(",").filter(id => !champKeys.trinkets.has(id)).join(","); if (!kk) continue; const e = startClean[kk] ||= [0, 0]; e[0] += g; e[1] += w; }
+  const core = best(c.core, c.g), boots = best(c.boots, c.g), start = best(startClean, c.g), skills = best(c.skills, c.g);
   const [pri, sec, perks] = runes ? runes.k.split(":") : [];
-  const bans = raw.bans?.[champKeys[name]] || 0;
-  out.champs[key] = {
-    n: name, role, g: c.g, wr: +(c.w / c.g * 100).toFixed(2),
+  const bans = raw.bans?.[champKeys.key[ddId(name)]] || 0;
+  const id = ddId(name);
+  out.champs[`${id}|${role}`] = {
+    n: id, role, g: c.g, wr: +(c.w / c.g * 100).toFixed(2),
     pr: +(c.g / raw.matches * 100).toFixed(2),
     br: +(bans / raw.matches * 100).toFixed(2),
     runes: runes && { pri: +pri, sec: +sec, perks: perks.split(",").map(Number), g: runes.g, wr: runes.wr, share: runes.share },
@@ -63,7 +71,7 @@ for (const [key, c] of Object.entries(raw.champs)) {
     situational: Object.entries(c.items).filter(([id]) => !core?.k.split(",").includes(id)).sort((x, y) => y[1][0] - x[1][0]).slice(0, 4)
       .map(([id, [g, w]]) => ({ id, g, wr: +(w / g * 100).toFixed(1) })),
     skills: skills && { seq: skills.k, max: maxOrder(skills.k), g: skills.g, wr: skills.wr },
-    vs: Object.fromEntries(Object.entries(c.vs).map(([o, [g, w]]) => [o, [g, w]]))
+    vs: Object.fromEntries(Object.entries(c.vs).map(([o, [g, w]]) => [ddId(o), [g, w]]))
   };
 }
 // tier por posición: winrate ajustado a la muestra y presencia

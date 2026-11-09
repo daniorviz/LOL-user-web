@@ -91,7 +91,8 @@ const isFinished = id => {
   if ((it.tags || []).includes("Boots")) return false;
   return !(it.into || []).length && (it.gold?.total || 0) >= 2000;
 };
-const bootsSet = new Set(Object.keys(itemData).filter(id => (itemData[id].tags || []).includes("Boots") && (itemData[id].from || []).length && !(itemData[id].into || []).length));
+// botas mejoradas (cualquier nivel por encima de las básicas)
+const bootsSet = new Set(Object.keys(itemData).filter(id => (itemData[id].tags || []).includes("Boots") && id !== "1001" && (itemData[id].gold?.total || 0) >= 700));
 
 /* ---------- jugadores ---------- */
 async function playersFor(tier) {
@@ -153,10 +154,10 @@ function addMatch(m, tl) {
     // objetos
     const inv = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5].map(String).filter(x => x !== "0");
     inv.filter(isFinished).forEach(id => bump(c.items, id, win));
-    const boots = inv.find(id => bootsSet.has(id)); if (boots) bump(c.boots, boots, win);
+    const boots = inv.filter(id => bootsSet.has(id)).sort((x, y) => itemData[y].gold.total - itemData[x].gold.total)[0]; if (boots) bump(c.boots, boots, win);
     const order = buys[p.participantId];
     if (order) {
-      const start = order.filter(([t]) => t < 60000).map(([, id]) => id).sort();
+      const start = order.filter(([t, id]) => t < 60000 && !(itemData[id]?.tags || []).includes("Trinket")).map(([, id]) => id).sort();
       if (start.length) bump(c.start, start.join(","), win);
       const core = []; for (const [, id] of order) if (isFinished(id) && !core.includes(id)) { core.push(id); if (core.length === 3) break; }
       if (core.length === 3) bump(c.core, core.join(","), win);

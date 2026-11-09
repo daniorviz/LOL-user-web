@@ -463,7 +463,7 @@ function renderBuild(){
       </div>
       <div class="blk"><h4>Objetos ${b.core?`<small>${b.core.wr}% WR · ${b.core.g} partidas</small>`:""}</h4>
         ${b.sums?`<div class="sub-h" style="margin-top:0"><span>Hechizos</span><span>${b.sums.wr}% WR</span></div><div class="sums">${b.sums.ids.map(id=>spr("sum",S.summoners[id]?.s,36,"",S.summoners[id]?.name)).join("")}<span style="font-size:13px;color:var(--muted)">${b.sums.ids.map(id=>esc(S.summoners[id]?.name||id)).join(" + ")}</span></div>`:""}
-        ${b.start?`<div class="sub-h"><span>Inicio</span><span>${b.start.wr}% WR</span></div><div class="items">${b.start.ids.map(id=>itemTile(id)).join("")}</div>`:""}
+        ${b.start?`<div class="sub-h"><span>Inicio</span><span>${b.start.wr}% WR</span></div><div class="items">${Object.entries(b.start.ids.reduce((m,id)=>(m[id]=(m[id]||0)+1,m),{})).map(([id,n])=>itemTile(id,"",n>1?`<em>×${n}</em>`:"")).join("")}</div>`:""}
         ${b.core?`<div class="sub-h"><span>Núcleo</span></div><div class="items">${b.core.ids.map(id=>itemTile(id,"core")).join('<span class="arrow">›</span>')}${b.boots?'<span class="arrow">+</span>'+itemTile(b.boots.id):""}</div>`:""}
         ${b.situational?.length?`<div class="sub-h"><span>Situacionales</span></div><div class="items">${b.situational.map(s=>itemTile(s.id,"",`<em>${s.wr}%</em>`)).join("")}</div>`:""}
       </div>
