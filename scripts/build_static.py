@@ -71,7 +71,7 @@ for k in order:
 # ---- objetos (Grieta del Invocador, comprables)
 items = J("item.json")["data"]
 keep = [i for i, v in items.items()
-        if v.get("maps", {}).get("11") and v.get("gold", {}).get("purchasable") and v.get("gold", {}).get("total", 0) > 0
+        if v.get("maps", {}).get("11") and (v.get("gold", {}).get("purchasable") or v.get("gold", {}).get("total", 0) > 0 or v.get("from"))
         and os.path.exists(f"{RAW}/img/item/{i}.png") and int(i) < 100000]
 keep.sort(key=int)
 iidx, isheet = sheet("items", [f"{RAW}/img/item/{i}.png" for i in keep], 48, 30)
