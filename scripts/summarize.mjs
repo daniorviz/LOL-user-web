@@ -34,7 +34,9 @@ function best(map, total) {
   if (!rows.length) return null;
   const floor = Math.max(3, Math.min(MIN, total * 0.1));
   const pool = rows.filter(r => r.g >= floor);
-  const pick = (pool.length ? pool : rows).sort((x, y) => wilson(y.w, y.g) - wilson(x.w, x.g) || y.g - x.g)[0];
+  // sin opciones con muestra suficiente: la más jugada (no la de winrate más alto, que sería ruido)
+  const pick = pool.length ? pool.sort((x, y) => wilson(y.w, y.g) - wilson(x.w, x.g) || y.g - x.g)[0]
+                           : rows.sort((x, y) => y.g - x.g || y.w - x.w)[0];
   return { k: pick.k, g: pick.g, wr: +(pick.w / pick.g * 100).toFixed(1), share: +(pick.g / total * 100).toFixed(1) };
 }
 function maxOrder(seq) {
