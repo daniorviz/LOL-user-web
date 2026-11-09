@@ -1,0 +1,54 @@
+# Agrega partidas nuevas y publica las estadísticas en la rama "stats".
+# Netlify solo despliega la rama de producción (main), así que actualizar estadísticas NO gasta créditos de Netlify.
+# La web lee builds.json directamente de raw.githubusercontent.com (por eso el repositorio debe ser público,
+# lo que además hace gratuitos los minutos de GitHub Actions).
+#
+# Requisitos:
+#   - Secreto RIOT_API_KEY (Settings → Secrets and variables → Actions). Clave personal o de producción:
+#     la de desarrollo caduca cada 24 h.
+#   - Opcional, en Variables: RIFT_PLATFORM (euw1), RIFT_TIERS (CHALLENGER,GRANDMASTER,MASTER), RIFT_MATCHES (1500).
+name: Actualizar estadísticas
+on:
+  schedule: [{ cron: "17 */6 * * *" }]
+  workflow_dispatch:
+permissions: { contents: write }
+concurrency: { group: stats, cancel-in-progress: false }
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      PLATFORM: ${{ vars.RIFT_PLATFORM || 'euw1' }}
+      TIERS: ${{ vars.RIFT_TIERS || 'CHALLENGER,GRANDMASTER,MASTER' }}
+      MATCHES: ${{ vars.RIFT_MATCHES || '1500' }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: Recuperar el acumulado anterior
+        run: |
+          mkdir -p data
+          if git fetch --depth 1 origin stats 2>/dev/null; then
+            git show origin/stats:data/stats.json > data/stats.json 2>/dev/null || rm -f data/stats.json
+          fi
+
+      - name: Agregar partidas (Match-V5)
+        env: { RIOT_API_KEY: "${{ secrets.RIOT_API_KEY }}" }
+        run: node scripts/aggregate.mjs --platform "$PLATFORM" --tiers "$TIERS" --matches "$MATCHES" --timelines 1
+
+      - name: Generar builds.json
+        run: node scripts/summarize.mjs --min 20
+
+      - name: Publicar en la rama stats (un único commit, sin historial que crezca)
+        run: |
+          mkdir -p /tmp/out && cp data/stats.json data/builds.json /tmp/out/
+          git config user.name "rift-scout-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan stats-new
+          git rm -rfq .
+          mkdir -p data && cp /tmp/out/*.json data/
+          git add data
+          git commit -qm "Estadísticas $(date -u +'%F %H:%M') UTC"
+          git push -f origin stats-new:stats

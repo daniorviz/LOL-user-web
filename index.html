@@ -1,0 +1,530 @@
+<meta charset="utf-8">
+<title>Rift Scout</title>
+<!-- Estadísticas: se leen de la rama "stats" del repositorio de GitHub, así actualizarlas no redespliega Netlify.
+     Cambia daniorviz/LOL-user-web por los tuyos (el repositorio debe ser público). -->
+<meta name="rift-stats" content="https://raw.githubusercontent.com/daniorviz/LOL-user-web/stats/data/builds.json">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky top bar → esports (final, bracket, Swiss, other leagues) → 4-step pick assistant (role · rival · counters · build) */
+:root{
+  color-scheme:dark;
+  --bg:#0a1115; --panel:#111b21; --panel-2:#16232a; --line:#223139; --line-2:#2d404a;
+  --fg:#e4ece9; --muted:#8b9ca4; --dim:#5f717a;
+  --gold:#d8a543; --gold-soft:rgba(216,165,67,.14);
+  --blue:#4fb2c8; --blue-soft:rgba(79,178,200,.14);
+  --red:#e2625b; --red-soft:rgba(226,98,91,.14);
+  --win:#5fc28a; --lose:#e2625b;
+  --f-display:"Saira Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:6px;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;line-height:1.05;margin:0;text-wrap:balance}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.spr{display:inline-block;flex:none;background-repeat:no-repeat}
+.spr.round{border-radius:50%}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:20px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-size:24px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.brand i{width:22px;height:22px;border:2px solid var(--gold);transform:rotate(45deg);display:block;position:relative}
+.brand i::after{content:"";position:absolute;inset:4px;background:var(--gold)}
+.patch{font-family:var(--f-mono);font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:1px 8px}
+.nav{display:flex;gap:4px;margin-left:auto}
+.nav a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:6px 12px;border-radius:var(--r)}
+.nav a:hover{color:var(--fg);background:var(--panel)}
+
+section{padding-block:40px}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.sec-head h2{font-size:clamp(30px,5vw,44px);text-transform:uppercase}
+.sec-head p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.pill{display:inline-block;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid}
+.pill.live{color:var(--red);border-color:var(--red)}
+.pill.done{color:var(--win);border-color:var(--win)}
+.pill.soon{color:var(--gold);border-color:var(--gold)}
+
+/* esports */
+.final{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px;padding:28px;border:1px solid var(--line);border-radius:10px;
+  background:radial-gradient(120% 140% at 0% 0%,var(--blue-soft),transparent 55%),radial-gradient(120% 140% at 100% 100%,var(--red-soft),transparent 55%),var(--panel)}
+.team{display:flex;align-items:center;gap:16px;min-width:0}
+.team.r{flex-direction:row-reverse;text-align:right}
+.team b{display:block;font-family:var(--f-display);font-size:clamp(24px,3.4vw,36px);font-weight:800;text-transform:uppercase;line-height:1}
+.team small{color:var(--muted);font-size:13px}
+.vs{text-align:center}
+.vs .eyebrow{color:var(--gold)}
+.clock{display:flex;gap:10px;justify-content:center;margin:8px 0 6px}
+.clock div{min-width:52px;text-align:center}
+.clock span{display:block;font-family:var(--f-mono);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums}
+.clock em{font-style:normal;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.vs p{margin:0;font-size:13px;color:var(--muted)}
+.score-big{font-family:var(--f-mono);font-size:44px;font-weight:600}
+
+.bracket-scroll{overflow-x:auto;margin-top:22px;padding-bottom:6px}
+.bracket{display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:28px;min-width:760px}
+.round h3{font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:600}
+.round .stack{display:flex;flex-direction:column;justify-content:space-around;gap:12px;height:calc(100% - 30px)}
+.match{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
+.match .meta{display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;color:var(--dim);font-family:var(--f-mono);border-bottom:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:10px;padding:7px 12px}
+.row + .row{border-top:1px solid var(--line)}
+.row .nm{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sc{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.row.lose{color:var(--dim)}
+.row.lose .spr{opacity:.55}
+.row.win .sc{color:var(--gold)}
+.match.next{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-soft)}
+
+details.swiss{margin-top:18px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+details.swiss summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+details.swiss summary::after{content:"+";font-family:var(--f-mono);color:var(--muted)}
+details.swiss[open] summary::after{content:"–"}
+.swiss-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;padding:0 16px 16px}
+.mini{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r);font-size:13px;min-width:0}
+.mini .a,.mini .b{display:flex;align-items:center;gap:6px;min-width:0}
+.mini .b{flex-direction:row-reverse}
+.mini span.c{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini .lose{color:var(--dim)}
+.mini .s{font-family:var(--f-mono);font-size:12px;text-align:center;color:var(--muted)}
+.mini .s b{color:var(--fg)}
+.mini .d{grid-column:1/-1;font-family:var(--f-mono);font-size:10.5px;color:var(--dim)}
+
+.other{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:22px}
+.lg{border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;background:var(--panel);min-width:0;display:flex;flex-direction:column;gap:10px}
+.lg header{display:flex;align-items:center;gap:10px}
+.lg header b{font-family:var(--f-display);font-size:19px;text-transform:uppercase}
+.lg header small{display:block;color:var(--dim);font-size:11.5px;font-family:var(--f-mono)}
+.lg .res{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;font-size:13.5px}
+.lg .res div{display:flex;align-items:center;gap:6px;min-width:0}
+.lg .res div:last-child{flex-direction:row-reverse;text-align:right}
+.lg .res .c{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg .res .lose{color:var(--dim)}
+.lg .res .sc{font-family:var(--f-mono);font-weight:600}
+.lg .champ{font-size:12px;color:var(--gold)}
+
+/* pick assistant */
+.pick{border-top:1px solid var(--line);background:linear-gradient(var(--panel) 0,var(--bg) 320px)}
+.steps{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:22px;align-items:start}
+.card{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:18px;min-width:0}
+.step-title{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.step-title b{font-family:var(--f-mono);font-size:12px;color:var(--gold)}
+.step-title h3{font-size:20px;text-transform:uppercase}
+.step-title span{margin-left:auto;font-size:12px;color:var(--dim)}
+.stack-l{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+.roles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.role{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);font-size:12px;font-weight:600;color:var(--muted)}
+.role svg{width:24px;height:24px}
+.role[aria-pressed="true"]{border-color:var(--gold);color:var(--fg);background:var(--gold-soft)}
+.role[aria-pressed="true"] svg{color:var(--gold)}
+
+.search{width:100%;padding:9px 12px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--bg);color:var(--fg);font:inherit;font-size:14px}
+.search::placeholder{color:var(--dim)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:4px;margin-top:10px;max-height:330px;overflow-y:auto;padding-right:2px}
+.ch{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;border:1px solid transparent;border-radius:var(--r);background:none;font-size:11px;color:var(--muted);min-width:0}
+.ch span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch .spr{border-radius:6px}
+.ch:hover{background:var(--panel-2);color:var(--fg)}
+.ch[aria-pressed="true"]{border-color:var(--red);color:var(--fg);background:var(--red-soft)}
+.ch.me[aria-pressed="true"]{border-color:var(--gold);background:var(--gold-soft)}
+.skip{margin-top:10px;width:100%;padding:8px;border:1px dashed var(--line-2);border-radius:var(--r);background:none;color:var(--muted);font-size:13px}
+.skip[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);border-style:solid}
+
+.counters{display:flex;flex-direction:column;gap:6px}
+.ctr{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);text-align:left;min-width:0}
+.ctr:hover{border-color:var(--line-2)}
+.ctr[aria-pressed="true"]{border-color:var(--gold);background:var(--gold-soft)}
+.ctr .spr{border-radius:6px}
+.ctr strong{display:block;font-size:14.5px}
+.ctr small{color:var(--muted);font-size:12px}
+.wr{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums;color:var(--win);text-align:right}
+.wr.neg{color:var(--lose)}
+.wr small{display:block;color:var(--dim);font-weight:400;font-size:10.5px}
+.bar{height:4px;background:var(--line);border-radius:2px;margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--win)}
+.toggle{background:none;border:none;color:var(--blue);font-size:12.5px;padding:0;margin-top:10px;text-decoration:underline;text-underline-offset:3px}
+.empty{border:1px dashed var(--line-2);border-radius:var(--r);padding:14px;color:var(--muted);font-size:13.5px}
+.empty b{color:var(--fg)}
+.empty code{font-family:var(--f-mono);font-size:12px;color:var(--gold)}
+
+.build-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.build-head .spr{border-radius:12px;border:2px solid var(--gold)}
+.build-head h3{font-size:clamp(30px,4vw,42px);text-transform:uppercase}
+.build-head .sub{color:var(--muted);font-size:13.5px}
+.stats{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
+.stat{text-align:right}
+.stat b{display:block;font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
+.stat em{font-style:normal;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.tier{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:6px;font-family:var(--f-display);font-weight:800;font-size:20px;color:#0a1115}
+.matchup{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r);background:var(--panel-2);border:1px solid var(--line);margin-bottom:18px;font-size:13.5px}
+.matchup .spr{border-radius:6px}
+.matchup b{font-family:var(--f-mono)}
+
+.blocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+.blk h4{font-family:var(--f-display);font-size:16px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.blk h4 small{font-family:var(--f-mono);font-size:11px;letter-spacing:0;text-transform:none;color:var(--dim);font-weight:400}
+.blk.full{grid-column:1/-1}
+
+.runes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tree{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--panel-2);min-width:0}
+.tree .tn{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;color:var(--muted)}
+.rrow{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
+.rrow .spr{opacity:.22;filter:grayscale(1)}
+.rrow .spr.on{opacity:1;filter:none}
+.rrow.key .spr.on{filter:drop-shadow(0 0 6px rgba(216,165,67,.5))}
+.picked{font-size:12.5px;color:var(--muted);margin-top:4px}
+.picked b{color:var(--fg);font-weight:600}
+.shards{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.shards span{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px 3px 4px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted)}
+
+.items{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.it{display:flex;flex-direction:column;align-items:center;gap:4px;width:72px;text-align:center;font-size:11px;color:var(--muted);line-height:1.2}
+.it .spr{border-radius:6px;border:2px solid var(--line-2)}
+.it.core .spr{border-color:var(--gold)}
+.it em{font-style:normal;font-family:var(--f-mono);font-size:10px;color:var(--dim)}
+.arrow{color:var(--dim);font-family:var(--f-mono);padding-top:14px}
+.sub-h{font-size:11px;font-family:var(--f-mono);color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;justify-content:space-between}
+.sums{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sums .spr{border-radius:6px}
+
+.abil{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.ab{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);min-width:0}
+.ab .spr{border-radius:6px}
+.ab b{font-size:13.5px}
+.ab .k{font-family:var(--f-display);font-weight:700;color:var(--blue);margin-right:6px}
+.ab .cd{float:right;font-family:var(--f-mono);font-size:10.5px;color:var(--dim)}
+.ab p{margin:3px 0 0;font-size:12.5px;color:var(--muted);line-height:1.4}
+
+.skills-scroll{overflow-x:auto;margin-bottom:12px}
+.skills{border-collapse:separate;border-spacing:3px;font-family:var(--f-mono);font-size:12px;min-width:600px}
+.skills th{font-weight:600;color:var(--dim);font-size:10.5px;padding:0 2px}
+.skills td{width:30px;height:28px;text-align:center;border-radius:4px;background:var(--panel-2)}
+.skills td.k{background:none;width:auto;padding-right:4px;text-align:left}
+.skills td.on{background:var(--blue);color:#0a1115;font-weight:600}
+.skills tr.R td.on{background:var(--gold)}
+.prio{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-family:var(--f-display);font-size:20px;font-weight:700}
+.prio .spr{border-radius:6px;border:2px solid var(--line-2)}
+.prio .spr:first-child{border-color:var(--blue)}
+.prio em{font-style:normal;color:var(--dim);font-size:16px}
+
+.note{margin-top:28px;padding:14px 16px;border:1px dashed var(--line-2);border-radius:var(--r);color:var(--muted);font-size:13.5px}
+.note b{color:var(--fg)}
+footer{padding-block:28px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+.loading{color:var(--dim);font-size:13px;padding:20px 0}
+
+@media (max-width:900px){.steps{grid-template-columns:1fr}}
+@media (max-width:640px){
+  .final{grid-template-columns:1fr;text-align:center;padding:20px}
+  .team,.team.r{flex-direction:column;text-align:center}
+  .blocks,.runes{grid-template-columns:1fr}
+  .stats{margin-left:0}
+  .nav a{padding:6px 8px;font-size:13px}
+  .brand{font-size:20px}
+  .patch{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><i></i>Rift Scout</div>
+    <span class="patch" id="patch-tag">Parche —</span>
+    <nav class="nav">
+      <a href="#esports">Competiciones</a>
+      <a href="#pick">Elige campeón</a>
+    </nav>
+  </div>
+</header>
+
+<section id="esports">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow" id="es-eyebrow">Worlds 2026</div>
+        <h2>Últimos resultados</h2>
+        <p>Cuadro del Mundial, fase suiza y la última final de cada liga, con datos de la API oficial de LoL Esports.</p>
+      </div>
+      <span class="pill soon" id="es-status">Cargando…</span>
+    </div>
+    <div id="final"><p class="loading">Cargando resultados…</p></div>
+    <div class="bracket-scroll"><div class="bracket" id="bracket"></div></div>
+    <details class="swiss" id="swiss-wrap"><summary id="swiss-sum">Fase suiza y play-in</summary><div class="swiss-list" id="swiss"></div></details>
+    <div class="other" id="others"></div>
+  </div>
+</section>
+
+<section id="pick" class="pick">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="eyebrow">Selección de campeón</div>
+        <h2>Prepara tu partida</h2>
+        <p>Elige tu línea y, si ya lo sabes, contra quién juegas. Te mostramos los counters y la build más jugada con mejor winrate: runas, objetos y orden de habilidades.</p>
+      </div>
+      <span class="pill done" id="sample-tag" hidden></span>
+    </div>
+
+    <div class="steps">
+      <div class="stack-l">
+        <div class="card">
+          <div class="step-title"><b>01</b><h3>Tu posición</h3></div>
+          <div class="roles" id="roles"></div>
+        </div>
+        <div class="card">
+          <div class="step-title"><b>02</b><h3>Tu rival</h3><span>opcional</span></div>
+          <label for="enemy-q" class="eyebrow" style="display:block;margin-bottom:6px">Campeón rival en tu línea</label>
+          <input class="search" id="enemy-q" type="search" placeholder="Buscar entre todos los campeones…" autocomplete="off">
+          <div class="grid" id="enemy-grid"></div>
+          <button class="skip" id="no-enemy" aria-pressed="false">Aún no sé contra quién juego</button>
+        </div>
+      </div>
+
+      <div class="stack-l">
+        <div class="card">
+          <div class="step-title"><b>03</b><h3 id="ctr-title">Counters</h3><span id="ctr-hint"></span></div>
+          <div class="counters" id="counters"></div>
+          <button class="toggle" id="all-toggle">Elegir otro campeón</button>
+          <div id="all-wrap" hidden>
+            <label for="me-q" class="eyebrow" style="display:block;margin:12px 0 6px">Cualquier campeón del juego</label>
+            <input class="search" id="me-q" type="search" placeholder="Buscar campeón…" autocomplete="off">
+            <div class="grid" id="me-grid"></div>
+          </div>
+        </div>
+        <div class="card" id="build"><p class="loading">Cargando campeones…</p></div>
+      </div>
+    </div>
+
+    <div class="note" id="data-note"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">Rift Scout no está respaldado por Riot Games y no refleja las opiniones de Riot Games ni de nadie implicado oficialmente en la producción o gestión de League of Legends. League of Legends y Riot Games son marcas comerciales o marcas registradas de Riot Games, Inc.</div>
+</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let S,E,B=null; // static, esports, builds
+const SHEETS={};
+
+/* ---------- sprites ---------- */
+function spr(sheet,i,d,cls="",title=""){
+  const sh=SHEETS[sheet]; if(i==null||!sh)return `<span class="spr ${cls}" style="width:${d}px;height:${d}px;background:var(--panel-2)"></span>`;
+  const c=i%sh.cols,r=Math.floor(i/sh.cols);
+  return `<span class="spr ${cls}" role="img" aria-label="${esc(title)}" title="${esc(title)}" style="width:${d}px;height:${d}px;background-image:url(${sh.file});background-size:${sh.cols*d}px ${sh.rows*d}px;background-position:-${c*d}px -${r*d}px"></span>`;
+}
+const logo=(t,d)=>t.img?`<img src="${esc(t.img)}" alt="" width="${d}" height="${d}" style="object-fit:contain;flex:none">`:spr("team",t.s,d,"",t.name||t.code);
+
+/* ---------- esports ---------- */
+const fmtDate=t=>new Date(t).toLocaleString("es-ES",{day:"numeric",month:"short",timeZone:"Europe/Madrid"});
+const fmtTime=t=>new Date(t).toLocaleString("es-ES",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Madrid"});
+function renderEsports(){
+  const ev=E.worlds.events, ko=ev.filter(e=>/Cuartos|Semifinal|Final/i.test(e.block||""));
+  const fin=ko.find(e=>/^Final$/i.test(e.block));
+  const sfs=ko.filter(e=>/Semifinal/i.test(e.block)), qfs=ko.filter(e=>/Cuartos/i.test(e.block));
+  // ordena cuartos según el cruce de semifinales
+  const qOrd=[];sfs.forEach(sf=>sf.teams.forEach(t=>{const q=qfs.find(q=>q.teams.some(x=>x.code===t.code));if(q&&!qOrd.includes(q))qOrd.push(q)}));
+  qfs.forEach(q=>{if(!qOrd.includes(q))qOrd.push(q)});
+  $("es-eyebrow").textContent=`${E.worlds.name} · Fase eliminatoria`;
+  if(fin){
+    const [a,b]=fin.teams, done=fin.state==="completed";
+    const sfOf=t=>{const m=sfs.find(s=>s.teams.some(x=>x.code===t.code));if(!m)return "";const o=m.teams.find(x=>x.code!==t.code);const me=m.teams.find(x=>x.code===t.code);return `${me.wins}–${o.wins} a ${o.code} en semis`};
+    $("es-status").className="pill "+(done?"done":fin.state==="inProgress"?"live":"soon");
+    $("es-status").textContent=done?"Final jugada":fin.state==="inProgress"?"En directo":"Final el "+fmtDate(fin.t);
+    $("final").innerHTML=`<div class="final">
+      <div class="team l">${logo(a,72)}<div><b>${esc(a.name)}</b><small>${sfOf(a)}</small></div></div>
+      <div class="vs"><div class="eyebrow">Gran final · Bo${fin.bo}</div>
+        ${done?`<div class="score-big">${a.wins} – ${b.wins}</div>`:`<div class="clock"><div><span id="cd-d">--</span><em>días</em></div><div><span id="cd-h">--</span><em>horas</em></div><div><span id="cd-m">--</span><em>min</em></div></div>`}
+        <p>${fmtTime(fin.t)} · hora peninsular</p></div>
+      <div class="team r">${logo(b,72)}<div><b>${esc(b.name)}</b><small>${sfOf(b)}</small></div></div></div>`;
+    if(!done){const at=Date.parse(fin.t);const tick=()=>{let s=Math.max(0,Math.floor((at-Date.now())/1000));const d=Math.floor(s/86400);s%=86400;
+      const set=(id,v)=>{const el=$(id);if(el)el.textContent=String(v).padStart(2,"0")};set("cd-d",d);set("cd-h",Math.floor(s/3600));set("cd-m",Math.floor(s%3600/60))};tick();setInterval(tick,30000)}
+  }
+  const match=m=>{const done=m.state==="completed";const w=done?(m.teams[0].wins>m.teams[1].wins?0:1):-1;
+    return `<div class="match ${m.state!=="completed"?"next":""}"><div class="meta"><span>${fmtDate(m.t)}</span><span>Bo${m.bo}${done?"":" · por jugar"}</span></div>
+      ${m.teams.map((t,i)=>`<div class="row ${w<0?"":w===i?"win":"lose"}">${logo(t,24)}<span class="nm">${esc(t.name)}</span><span class="sc">${done?t.wins:"–"}</span></div>`).join("")}</div>`};
+  const rounds=[["Cuartos",qOrd],["Semifinales",sfs],["Final",fin?[fin]:[]]].filter(r=>r[1].length);
+  $("bracket").innerHTML=rounds.map(([n,ms])=>`<div class="round"><h3>${n}</h3><div class="stack">${ms.map(match).join("")}</div></div>`).join("");
+  const sw=ev.filter(e=>!ko.includes(e)&&e.state==="completed").reverse();
+  $("swiss-sum").firstChild && ($("swiss-sum").textContent=`Fase suiza y play-in · ${sw.length} series`);
+  $("swiss").innerHTML=sw.map(m=>{const w=m.teams[0].wins>m.teams[1].wins?0:1;return `<div class="mini">
+      <div class="a ${w===0?"":"lose"}">${logo(m.teams[0],20)}<span class="c">${esc(m.teams[0].code)}</span></div>
+      <div class="s"><b>${m.teams[0].wins}</b>–<b>${m.teams[1].wins}</b></div>
+      <div class="b ${w===1?"":"lose"}">${logo(m.teams[1],20)}<span class="c">${esc(m.teams[1].code)}</span></div>
+      <div class="d">${esc(m.block||"")} · ${fmtDate(m.t)}</div></div>`}).join("");
+  $("others").innerHTML=E.others.map(o=>{const [a,b]=o.teams;const w=a.wins>b.wins?a:b;return `<article class="lg">
+      <header>${logo({s:o.s,img:o.img,name:o.league},36)}<div><b>${esc(o.league)}</b><small>${esc(o.region)} · ${fmtDate(o.t)} · ${esc(o.block||"")}</small></div></header>
+      <div class="res"><div class="${a===w?"":"lose"}">${logo(a,26)}<span class="c">${esc(a.name)}</span></div><span class="sc">${a.wins}–${b.wins}</span><div class="${b===w?"":"lose"}">${logo(b,26)}<span class="c">${esc(b.name)}</span></div></div>
+      ${/final/i.test(o.block||"")?`<div class="champ">Campeón: ${esc(w.name)}</div>`:""}</article>`}).join("");
+}
+
+/* ---------- pick assistant ---------- */
+const ROLES=[{id:"top",n:"Top"},{id:"jungle",n:"Jungla"},{id:"mid",n:"Mid"},{id:"adc",n:"ADC"},{id:"support",n:"Support"}];
+const ICONS={
+  top:'<svg viewBox="0 0 24 24" fill="none"><path d="M3 3h13l-4 4H7v5l-4 4z" fill="currentColor"/><rect x="10" y="10" width="4" height="4" fill="currentColor" opacity=".5"/><path d="M21 8v13H8l4-4h5v-5z" fill="currentColor" opacity=".35"/></svg>',
+  jungle:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 2c2 4 3 8 3 13l3 4c0-6 1-11-6-17zm14 0c-7 6-6 11-6 17l3-4c0-5 1-9 3-13zM12 9c-1 3-1 6 0 13 1-7 1-10 0-13z"/></svg>',
+  mid:'<svg viewBox="0 0 24 24" fill="none"><path d="M3 17v4h4L21 7V3h-4z" fill="currentColor"/><path d="M3 3h9L3 12zM21 21h-9l9-9z" fill="currentColor" opacity=".35"/></svg>',
+  adc:'<svg viewBox="0 0 24 24" fill="none"><path d="M21 21H8l4-4h5v-5l4-4z" fill="currentColor"/><rect x="10" y="10" width="4" height="4" fill="currentColor" opacity=".5"/><path d="M3 16V3h13l-4 4H7v5z" fill="currentColor" opacity=".35"/></svg>',
+  support:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3h6l-1 4h-4zM2 7h7l2 3-2 3H6zM22 7h-7l-2 3 2 3h3zM10 10h4l1 11h-6z"/></svg>'
+};
+const TIERC={S:"#d8a543",A:"#5fc28a",B:"#4fb2c8",C:"#8b9ca4",D:"#5f717a"};
+let CH,byId,RUNE={},TREE={};
+const st={role:"mid",enemy:null,me:null,noEnemy:true,showAll:false};
+try{const s=JSON.parse(localStorage.getItem("riftscout2")||"null");if(s)Object.assign(st,s,{showAll:false})}catch(e){}
+const save=()=>{try{localStorage.setItem("riftscout2",JSON.stringify(st))}catch(e){}};
+
+const wilson=(w,n,z=1.645)=>{if(!n)return 0;const p=w/n;return (p+z*z/(2*n)-z*Math.sqrt((p*(1-p)+z*z/(4*n))/n))/(1+z*z/n)};
+const bld=(id,role)=>B?.champs?.[`${id}|${role}`];
+const inRole=(c,role)=>!c.roles.length||c.roles.includes(role)||!!bld(c.id,role);
+const norm=s=>s.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase();
+
+function renderRoles(){$("roles").innerHTML=ROLES.map(r=>`<button class="role" data-role="${r.id}" aria-pressed="${st.role===r.id}">${ICONS[r.id]}${r.n}</button>`).join("")}
+function chGrid(list,attr,cls,sel){
+  return list.map(c=>`<button class="ch ${cls}" data-${attr}="${c.id}" aria-pressed="${sel===c.id}">${spr("champ",c.s,40,"",c.name)}<span>${esc(c.name)}</span></button>`).join("")
+    ||`<p style="color:var(--dim);font-size:13px;grid-column:1/-1;margin:6px 0">Ningún campeón coincide.</p>`;
+}
+function renderEnemy(){
+  const q=norm($("enemy-q").value.trim());
+  const list=CH.filter(c=>q?norm(c.name).includes(q):inRole(c,st.role));
+  $("enemy-grid").innerHTML=chGrid(list,"enemy","",st.enemy);
+  $("no-enemy").setAttribute("aria-pressed",st.noEnemy);
+}
+function counterRows(){
+  if(!B)return null;
+  if(st.enemy&&!st.noEnemy){
+    const rows=[];
+    for(const c of CH){const b=bld(c.id,st.role);const v=b?.vs?.[st.enemy];if(!v||v[0]<Math.max(5,(B.min||20)/2))continue;
+      if(v[1]/v[0]<.5)continue;rows.push({c,g:v[0],wr:v[1]/v[0]*100,score:wilson(v[1],v[0])})}
+    return rows.sort((a,b)=>b.score-a.score).slice(0,6).map(r=>({...r,label:`${r.g} partidas contra ${byId[st.enemy].name}`}));
+  }
+  return CH.map(c=>({c,b:bld(c.id,st.role)})).filter(x=>x.b&&x.b.g>=(B.min||20))
+    .sort((x,y)=>"SABCD".indexOf(x.b.tier||"D")-"SABCD".indexOf(y.b.tier||"D")||y.b.wr-x.b.wr).slice(0,6)
+    .map(x=>({c:x.c,wr:x.b.wr,g:x.b.g,label:`Tier ${x.b.tier||"–"} · pick ${x.b.pr}% · ${x.b.g} partidas`}));
+}
+function renderCounters(){
+  const vsMode=st.enemy&&!st.noEnemy;
+  $("ctr-title").textContent=vsMode?`Counters de ${byId[st.enemy].name}`:"Lo más fuerte en tu línea";
+  $("ctr-hint").textContent=vsMode?"winrate contra él":"winrate general";
+  const rows=counterRows();
+  if(!rows){
+    $("counters").innerHTML=`<div class="empty"><b>Sin estadísticas de partidas todavía.</b> Los counters y las builds salen de agregar partidas reales con la API de Riot (Match-V5). En cuanto el agregador publique <code>builds.json</code> aparecerán aquí. Mientras, elige cualquier campeón para ver sus habilidades.</div>`;
+    st.showAll=true;
+  }else if(!rows.length){
+    $("counters").innerHTML=`<div class="empty">Aún no hay suficientes partidas ${vsMode?`contra ${esc(byId[st.enemy].name)} en esta línea`:"en esta línea"} para sacar conclusiones fiables.</div>`;
+  }else{
+    $("counters").innerHTML=rows.map(r=>`<button class="ctr" data-me="${r.c.id}" aria-pressed="${st.me===r.c.id}">
+      ${spr("champ",r.c.s,40,"",r.c.name)}<div style="min-width:0"><strong>${esc(r.c.name)}</strong><small>${r.label}</small>
+      <div class="bar"><i style="width:${Math.max(4,Math.min(100,(r.wr-40)/20*100))}%"></i></div></div>
+      <div class="wr ${r.wr<50?"neg":""}">${r.wr.toFixed(1)}%<small>WR</small></div></button>`).join("");
+  }
+  $("all-wrap").hidden=!st.showAll;
+  $("all-toggle").hidden=!rows;
+  $("all-toggle").textContent=st.showAll?"Ocultar lista completa":"Elegir otro campeón";
+  if(st.showAll){const q=norm($("me-q").value.trim());$("me-grid").innerHTML=chGrid(CH.filter(c=>q?norm(c.name).includes(q):inRole(c,st.role)),"me","me",st.me)}
+}
+function itemTile(id,cls="",extra=""){const it=S.items[id];return `<div class="it ${cls}">${spr("item",it?.s,44,"",it?.name||id)}<span>${esc(it?.name||id)}</span>${extra}</div>`}
+function runeTree(treeId,picked,secondary){
+  const t=TREE[treeId];if(!t)return "";
+  const rows=(secondary?t.slots.slice(1):t.slots).map((sl,i)=>`<div class="rrow ${!secondary&&i===0?"key":""}">${sl.map(r=>spr("rune",r.s,!secondary&&i===0?40:30,"round "+(picked.includes(r.id)?"on":""),r.name)).join("")}</div>`).join("");
+  const names=picked.map(id=>RUNE[id]?.name).filter(Boolean);
+  return `<div class="tree"><div class="tn">${spr("rune",t.s,20,"",t.name)}${esc(t.name)}${secondary?" · secundario":""}</div>${rows}
+    <div class="picked">${names.map((n,i)=>i===0&&!secondary?`<b>${esc(n)}</b>`:esc(n)).join(" · ")}</div></div>`;
+}
+const stat=(v,l)=>`<div class="stat"><b>${v}</b><em>${l}</em></div>`;
+function renderBuild(){
+  const c=byId[st.me];if(!c){$("build").innerHTML="";return}
+  const b=bld(c.id,st.role);
+  const roleN=ROLES.find(r=>r.id===st.role).n;
+  let mu="";
+  if(b&&st.enemy&&!st.noEnemy&&st.enemy!==c.id){
+    const e=byId[st.enemy],v=b.vs?.[st.enemy];
+    mu=v&&v[0]>=5?`<div class="matchup">${spr("champ",e.s,30,"",e.name)}<span>Contra <strong>${esc(e.name)}</strong>: <b style="color:${v[1]/v[0]>=.5?"var(--win)":"var(--lose)"}">${(v[1]/v[0]*100).toFixed(1)}%</b> de victorias en ${v[0]} partidas.</span></div>`
+      :`<div class="matchup">${spr("champ",e.s,30,"",e.name)}<span>Pocas partidas de este enfrentamiento contra <strong>${esc(e.name)}</strong>. Se muestra la build general.</span></div>`;
+  }
+  const abil=[{k:"P",...c.passive},...c.spells];
+  const abilHtml=`<div class="abil">${abil.map(a=>`<div class="ab">${spr("ability",a.s,40,"",a.name)}<div style="min-width:0"><b><span class="k">${a.k}</span>${esc(a.name)}</b>${a.cd?`<span class="cd">${esc(a.cd)} s</span>`:""}<p>${esc(a.desc)}</p></div></div>`).join("")}</div>`;
+  let body;
+  if(b){
+    const r=b.runes, sk=b.skills;
+    const seq=sk?[...sk.seq]:[];
+    const spellS=k=>c.spells.find(s=>s.k===k)?.s;
+    body=`<div class="blocks">
+      <div class="blk"><h4>Runas ${r?`<small>${r.wr}% WR · ${r.g} partidas</small>`:""}</h4>
+        ${r?`<div class="runes">${runeTree(r.pri,r.perks.slice(0,4))}${runeTree(r.sec,r.perks.slice(4,6),true)}</div>`:`<div class="empty">Sin datos de runas.</div>`}
+        ${b.shards?`<div class="shards">${b.shards.ids.map(id=>`<span>${spr("rune",S.shards[id]?.s,22,"round",S.shards[id]?.name)}${esc(S.shards[id]?.name||id)}</span>`).join("")}</div>`:""}
+      </div>
+      <div class="blk"><h4>Objetos ${b.core?`<small>${b.core.wr}% WR · ${b.core.g} partidas</small>`:""}</h4>
+        ${b.sums?`<div class="sub-h" style="margin-top:0"><span>Hechizos</span><span>${b.sums.wr}% WR</span></div><div class="sums">${b.sums.ids.map(id=>spr("sum",S.summoners[id]?.s,36,"",S.summoners[id]?.name)).join("")}<span style="font-size:13px;color:var(--muted)">${b.sums.ids.map(id=>esc(S.summoners[id]?.name||id)).join(" + ")}</span></div>`:""}
+        ${b.start?`<div class="sub-h"><span>Inicio</span><span>${b.start.wr}% WR</span></div><div class="items">${b.start.ids.map(id=>itemTile(id)).join("")}</div>`:""}
+        ${b.core?`<div class="sub-h"><span>Núcleo</span></div><div class="items">${b.core.ids.map(id=>itemTile(id,"core")).join('<span class="arrow">›</span>')}${b.boots?'<span class="arrow">+</span>'+itemTile(b.boots.id):""}</div>`:""}
+        ${b.situational?.length?`<div class="sub-h"><span>Situacionales</span></div><div class="items">${b.situational.map(s=>itemTile(s.id,"",`<em>${s.wr}%</em>`)).join("")}</div>`:""}
+      </div>
+      <div class="blk full"><h4>Orden de habilidades ${sk?`<small>${sk.wr}% WR · ${sk.g} partidas</small>`:""}</h4>
+        ${sk?`<div class="prio">${[...sk.max].map(k=>spr("ability",spellS(k),34,"",k)).join("<em>›</em>")}<em style="font-family:var(--f-body);font-size:13px;margin-left:6px">orden de maximizar (${[...sk.max].join(" › ")})</em></div>
+        <div class="skills-scroll"><table class="skills"><thead><tr><th></th>${seq.map((_,i)=>`<th>${i+1}</th>`).join("")}</tr></thead>
+        <tbody>${["Q","W","E","R"].map(k=>`<tr class="${k}"><td class="k">${spr("ability",spellS(k),26,"",k)}</td>${seq.map(x=>`<td class="${x===k?"on":""}">${x===k?k:""}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:""}
+        ${abilHtml}
+      </div></div>`;
+  }else{
+    body=`<div class="empty" style="margin-bottom:18px">${B?`Sin partidas suficientes de <b>${esc(c.name)}</b> en ${roleN} este parche.`:`<b>Runas, objetos y orden de habilidades</b> aparecerán cuando se generen las estadísticas de partidas.`}</div>
+      <div class="blk"><h4>Habilidades</h4>${abilHtml}</div>`;
+  }
+  const t=b?.tier;
+  $("build").innerHTML=`<div class="step-title"><b>04</b><h3>Build recomendada</h3><span>más jugada · más winrate</span></div>
+    <div class="build-head">${spr("champ",c.s,68,"",c.name)}
+      <div><h3>${esc(c.name)}</h3><div class="sub">${esc(c.title)} · ${roleN}${c.tags.length?" · "+c.tags.join(", "):""}</div></div>
+      <div class="stats">${b?`<div class="stat"><span class="tier" style="background:${TIERC[t]||"#5f717a"}">${t||"–"}</span><em style="display:block;margin-top:2px">Tier</em></div>${stat(b.wr.toFixed(1)+"%","Winrate")}${stat(b.pr.toFixed(1)+"%","Pick rate")}${stat(b.br.toFixed(1)+"%","Ban rate")}${stat(b.g.toLocaleString("es-ES"),"Partidas")}`:stat("—","Winrate")+stat("—","Pick rate")}</div>
+    </div>${mu}${body}`;
+}
+function defaultMe(){
+  if(st.enemy&&!st.noEnemy){const r=counterRows();if(r?.length)return r[0].c.id}
+  const r=counterRows();if(r?.length)return r[0].c.id;
+  return (CH.find(c=>inRole(c,st.role))||CH[0]).id;
+}
+function renderAll(){renderRoles();renderEnemy();renderCounters();renderBuild();save()}
+
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest("button");if(!b)return;
+  if(b.dataset.role){if(st.role!==b.dataset.role){st.role=b.dataset.role;st.enemy=null;st.noEnemy=true;$("enemy-q").value="";st.me=defaultMe()}renderAll()}
+  else if(b.dataset.enemy){st.enemy=b.dataset.enemy;st.noEnemy=false;$("enemy-q").value="";st.me=defaultMe();renderAll()}
+  else if(b.id==="no-enemy"){st.noEnemy=true;st.enemy=null;st.me=defaultMe();renderAll()}
+  else if(b.dataset.me){st.me=b.dataset.me;renderCounters();renderBuild();save();if(innerWidth<900)$("build").scrollIntoView({behavior:"smooth",block:"start"})}
+  else if(b.id==="all-toggle"){st.showAll=!st.showAll;renderCounters()}
+});
+$("enemy-q").addEventListener("input",renderEnemy);
+$("me-q").addEventListener("input",renderCounters);
+
+/* ---------- carga ---------- */
+async function getJSON(u){const r=await fetch(u,{cache:"no-cache"});if(!r.ok)throw new Error(u+" "+r.status);return r.json()}
+(async()=>{
+  S=await getJSON("data/static.json");
+  Object.assign(SHEETS,S.sheets);
+  CH=S.champions;byId=Object.fromEntries(CH.map(c=>[c.id,c]));
+  S.runes.forEach(t=>{TREE[t.id]=t;t.slots.flat().forEach(r=>RUNE[r.id]=r)});
+  $("patch-tag").textContent="Parche "+S.version.split(".").slice(0,2).join(".");
+  const remote=document.querySelector('meta[name="rift-stats"]')?.content||"";
+  for(const u of [remote.includes("daniorviz/LOL-user-web")?null:remote,"data/builds.json"].filter(Boolean)){try{B=await getJSON(u);break}catch(e){B=null}}
+  if(B){const tag=$("sample-tag");tag.hidden=false;tag.textContent=`${B.matches.toLocaleString("es-ES")} partidas · ${B.platform.toUpperCase()} · ${B.tiers.map(t=>t[0]+t.slice(1).toLowerCase()).join("/")}`}
+  $("data-note").innerHTML=B
+    ?`<b>Estadísticas reales</b> de ${B.matches.toLocaleString("es-ES")} partidas clasificatorias del parche ${esc(B.patch)} (${esc(B.platform.toUpperCase())}, ${esc(B.tiers.join(", "))}), agregadas con la API de Riot el ${new Date(B.generated).toLocaleString("es-ES")}. Las opciones recomendadas son las más jugadas con mejor winrate ajustado a la muestra. Iconos de Data Dragon ${esc(S.version)}.`
+    :`<b>Datos reales del juego</b>: ${CH.length} campeones con sus habilidades, objetos y runas del parche ${esc(S.version)} (Data Dragon). Las estadísticas de builds y counters se generan agregando partidas con la API de Riot (Match-V5); todavía no hay un archivo de estadísticas cargado.`;
+  if(!byId[st.me])st.me=null;if(st.enemy&&!byId[st.enemy]){st.enemy=null;st.noEnemy=true}
+  if(!st.me)st.me=defaultMe();
+  renderAll();
+})().catch(e=>{$("build").innerHTML=`<div class="empty">No se pudieron cargar los datos del juego (${esc(e.message)}).</div>`});
+
+(async()=>{
+  try{E=await getJSON("api/esports")}catch(e){E=null}
+  if(!E||!E.worlds)E=await getJSON("data/esports.json");
+  Object.assign(SHEETS,{team:E.sheet});
+  renderEsports();
+})().catch(e=>{$("final").innerHTML=`<div class="empty">No se pudieron cargar los resultados (${esc(e.message)}).</div>`});
+</script>
