@@ -511,7 +511,7 @@ async function getJSON(u){const r=await fetch(u,{cache:"no-cache"});if(!r.ok)thr
   S.runes.forEach(t=>{TREE[t.id]=t;t.slots.flat().forEach(r=>RUNE[r.id]=r)});
   $("patch-tag").textContent="Parche "+S.version.split(".").slice(0,2).join(".");
   const remote=document.querySelector('meta[name="rift-stats"]')?.content||"";
-  for(const u of [remote.includes("daniorviz/LOL-user-web")?null:remote,"data/builds.json"].filter(Boolean)){try{B=await getJSON(u);break}catch(e){B=null}}
+  for(const u of [remote.includes("USUARIO")?null:remote,"data/builds.json"].filter(Boolean)){try{B=await getJSON(u);break}catch(e){B=null}}
   if(B){const tag=$("sample-tag");tag.hidden=false;tag.textContent=`${B.matches.toLocaleString("es-ES")} partidas · ${B.platform.toUpperCase()} · ${B.tiers.map(t=>t[0]+t.slice(1).toLowerCase()).join("/")}`}
   $("data-note").innerHTML=B
     ?`<b>Estadísticas reales</b> de ${B.matches.toLocaleString("es-ES")} partidas clasificatorias del parche ${esc(B.patch)} (${esc(B.platform.toUpperCase())}, ${esc(B.tiers.join(", "))}), agregadas con la API de Riot el ${new Date(B.generated).toLocaleString("es-ES")}. Las opciones recomendadas son las más jugadas con mejor winrate ajustado a la muestra. Iconos de Data Dragon ${esc(S.version)}.`
