@@ -22,12 +22,20 @@ jobs:
       TIERS: ${{ vars.RIFT_TIERS || 'CHALLENGER,GRANDMASTER,MASTER' }}
       MATCHES: ${{ vars.RIFT_MATCHES || '1500' }}
     steps:
+      - name: Comprobar la clave
+        id: key
+        env: { RIOT_API_KEY: "${{ secrets.RIOT_API_KEY }}" }
+        run: |
+          if [ -z "$RIOT_API_KEY" ]; then echo "Sin secreto RIOT_API_KEY: se omite la actualización."; echo "ok=false" >> "$GITHUB_OUTPUT"; else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
         with: { fetch-depth: 1 }
       - uses: actions/setup-node@v4
+        if: steps.key.outputs.ok == 'true'
         with: { node-version: 22 }
 
       - name: Recuperar el acumulado anterior
+        if: steps.key.outputs.ok == 'true'
         run: |
           mkdir -p data
           if git fetch --depth 1 origin stats 2>/dev/null; then
@@ -35,13 +43,16 @@ jobs:
           fi
 
       - name: Agregar partidas (Match-V5)
+        if: steps.key.outputs.ok == 'true'
         env: { RIOT_API_KEY: "${{ secrets.RIOT_API_KEY }}" }
         run: node scripts/aggregate.mjs --platform "$PLATFORM" --tiers "$TIERS" --matches "$MATCHES" --timelines 1
 
       - name: Generar builds.json
+        if: steps.key.outputs.ok == 'true'
         run: node scripts/summarize.mjs --min 20
 
       - name: Publicar en la rama stats (un único commit, sin historial que crezca)
+        if: steps.key.outputs.ok == 'true'
         run: |
           mkdir -p /tmp/out && cp data/stats.json data/builds.json /tmp/out/
           git config user.name "rift-scout-bot"
